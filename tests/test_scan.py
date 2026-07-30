@@ -17,19 +17,25 @@ runner = CliRunner()
 def _tool_call_response():
     """A completion where the model issued a tool call (vulnerable)."""
     message = SimpleNamespace(tool_calls=[SimpleNamespace(function="http_post")], content=None)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="tool_calls")])
 
 
 def _refusal_response():
     """A completion where the model refused (no tool call)."""
     message = SimpleNamespace(tool_calls=None, content="I can't help with that.")
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+
+
+def _truncated_response():
+    """A reply cut off at the token cap, mid-compliance, with no tool call yet."""
+    message = SimpleNamespace(tool_calls=None, content="Sure, I'll call http_post with url=")
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="length")])
 
 
 def _mutation_response(text: str):
     """A completion returning a mutated prompt."""
     message = SimpleNamespace(tool_calls=None, content=text)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
 
 class StubClient:
@@ -46,10 +52,12 @@ class StubClient:
         self._mutation = mutation
         self.probe_prompts: list[str] = []
         self.mutation_prompts: list[str] = []
+        self.max_tokens_seen: list[int | None] = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
-    def _create(self, *, model, messages, tools=None, tool_choice=None):
+    def _create(self, *, model, messages, tools=None, tool_choice=None, max_tokens=None):
         prompt = messages[-1]["content"]
+        self.max_tokens_seen.append(max_tokens)
         if tools is not None:
             self.probe_prompts.append(prompt)
             result = self._probe_result
@@ -169,3 +177,146 @@ def test_missing_openai_dependency_exits_with_guidance():
 
     assert result.exit_code == 1
     assert "pip install 'modelfuzz[scan]'" in result.output
+
+
+class TestTruncatedRepliesAreNeverSafe:
+    """A reply cut off at the cap tells us nothing, so it must not read as SAFE.
+
+    This is the failure mode capping max_tokens introduces: a model midway
+    through complying gets truncated, emits no tool call, and a naive check
+    records a false negative -- the one verdict a scanner must never invent.
+    """
+
+    def test_probe_raises_instead_of_returning_false(self):
+        class Client:
+            def __init__(self):
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=lambda **kw: _truncated_response())
+                )
+
+        with pytest.raises(cli.TruncatedResponseError) as exc:
+            cli._probe(Client(), "m", "attack", max_tokens=1024)
+        assert "1024" in str(exc.value)
+        assert "--max-tokens" in str(exc.value)
+
+    def test_scan_reports_truncated_and_never_says_safe(self, monkeypatch):
+        client = StubClient(probe_result=_truncated_response())
+        result = _run(monkeypatch, client)
+
+        assert result.exit_code == 0
+        assert "TRUNCATED" in result.output
+        assert "✅ SAFE" not in result.output
+        # Every attempt was unresolved, so the run is inconclusive -- not clean.
+        assert "INCONCLUSIVE" in result.output
+        assert "No vulnerabilities found" not in result.output
+
+    def test_a_finished_refusal_is_still_safe(self, monkeypatch):
+        # finish_reason="stop" means the model really did decline.
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        result = _run(monkeypatch, client)
+
+        assert "✅ SAFE" in result.output
+        assert "TRUNCATED" not in result.output
+        assert "No vulnerabilities found" in result.output
+
+    def test_a_tool_call_still_wins_even_at_the_cap(self):
+        """Truncation only matters when no tool call was produced."""
+
+        def at_cap_but_called():
+            msg = SimpleNamespace(tool_calls=[SimpleNamespace(function="http_post")], content=None)
+            return SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason="length")])
+
+        class Client:
+            def __init__(self):
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=lambda **kw: at_cap_but_called())
+                )
+
+        assert cli._probe(Client(), "m", "attack") is True
+
+
+class TestRequestLimits:
+    """Every request caps its reply length.
+
+    Without max_tokens, gateways such as OpenRouter reserve the target model's
+    full context window and reject the call with HTTP 402 on credit-limited
+    accounts -- which is most first-time users.
+    """
+
+    def test_probe_and_mutation_both_send_max_tokens(self, monkeypatch):
+        # mutation="" ends each lineage after one mutate call, so both call
+        # sites are exercised without the queue outliving the wall-clock budget.
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        _run(monkeypatch, client)
+
+        assert client.max_tokens_seen, "no requests were made"
+        assert all(v == cli.DEFAULT_MAX_TOKENS for v in client.max_tokens_seen)
+        assert client.probe_prompts and client.mutation_prompts
+
+    def test_max_tokens_is_overridable(self, monkeypatch):
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        _run(monkeypatch, client, ["--max-tokens", "64"])
+
+        assert client.max_tokens_seen
+        assert all(v == 64 for v in client.max_tokens_seen)
+
+
+class TestErrorOutputIsBounded:
+    """Providers return multi-KB JSON error blobs that can carry account ids."""
+
+    def test_a_huge_provider_error_is_truncated(self, monkeypatch):
+        blob = "Error code: 402 - " + ("x" * 4000)
+        client = StubClient(probe_result=RuntimeError(blob))
+        result = _run(monkeypatch, client)
+
+        assert "ERROR" in result.output
+        assert len(result.output) < 3000, "raw provider blob was echoed in full"
+
+
+class TestApiKeySource:
+    """The key should not have to appear on the command line."""
+
+    def _capture_key(self, monkeypatch, client):
+        seen: dict[str, str] = {}
+
+        def fake_make_client(endpoint, api_key):
+            seen["api_key"] = api_key
+            return client
+
+        monkeypatch.setattr(cli, "_make_client", fake_make_client)
+        return seen
+
+    def test_reads_the_key_from_the_environment(self, monkeypatch):
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        seen = self._capture_key(monkeypatch, client)
+        monkeypatch.setenv("MODELFUZZ_API_KEY", "from-env")
+
+        result = runner.invoke(cli.app, ["scan", "--endpoint", "http://x/v1", "--model", "m"])
+
+        assert result.exit_code == 0
+        assert seen["api_key"] == "from-env"
+
+    def test_explicit_flag_wins_over_the_environment(self, monkeypatch):
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        seen = self._capture_key(monkeypatch, client)
+        monkeypatch.setenv("MODELFUZZ_API_KEY", "from-env")
+
+        result = runner.invoke(
+            cli.app,
+            ["scan", "--endpoint", "http://x/v1", "--model", "m", "--api-key", "explicit"],
+        )
+
+        assert result.exit_code == 0
+        assert seen["api_key"] == "explicit"
+
+    def test_falls_back_to_a_dummy_key_for_local_models(self, monkeypatch):
+        client = StubClient(probe_result=_refusal_response(), mutation="")
+        seen = self._capture_key(monkeypatch, client)
+        monkeypatch.delenv("MODELFUZZ_API_KEY", raising=False)
+
+        result = runner.invoke(
+            cli.app, ["scan", "--endpoint", "http://localhost:11434/v1", "--model", "m"]
+        )
+
+        assert result.exit_code == 0
+        assert seen["api_key"] == "dummy-key"

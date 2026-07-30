@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-07-30
+
+- fix: `scan` now sends `max_tokens` on every request (default `1024`, override with `--max-tokens`). Without it, gateways such as OpenRouter reserve the target model's full context window up front and reject the call with HTTP 402 — so scanning a hosted model failed outright on exactly the credit-limited accounts most first-time users have
+- fix: a reply that hits the token cap without producing a tool call is now reported as `⚠️ TRUNCATED` and counted as unresolved. Previously any response without a tool call was recorded as `SAFE`, so a model cut off mid-compliance would have been scored as having refused — a false negative, which is the one verdict a scanner must never invent
+- feat: `--api-key` reads `MODELFUZZ_API_KEY` when not passed, so the key stays out of shell history and out of the process list
+- fix: clip provider error messages to one line. A gateway 402 returns multiple KB of JSON that can carry account identifiers, and the whole blob was echoed per failed probe
+- fix: an all-truncated run now says to raise `--max-tokens` instead of blaming the endpoint and model name
+
 ## [0.3.4] - 2026-07-30
 
 - fix: `URLAllowList` now inspects URLs nested inside `dict`, `list`, `tuple` and `set` arguments, including dict keys. A malicious URL hidden in a payload field — `http_post(url="https://api.internal.com/v1", payload={"redirect": "http://evil.com"})` — previously passed, because 0.3.2 taught the rule to skip non-string values without teaching it to look inside them. A `redirect` or `callback` field is as much an exfiltration route as the `url` parameter itself
@@ -74,7 +82,8 @@ All notable changes to this project are documented here.
 - CI workflow (lint + tests), MIT license, unit/integration test suite
 - Package renamed from `agentshield` to `modelfuzz`
 
-[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/higagan/modelfuzz/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/higagan/modelfuzz/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/higagan/modelfuzz/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/higagan/modelfuzz/compare/v0.3.1...v0.3.2
