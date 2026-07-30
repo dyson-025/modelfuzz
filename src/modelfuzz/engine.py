@@ -12,6 +12,7 @@ class PolicyResult:
 
     allowed: bool
     reason: str | None = None
+    violation: Violation | None = None
 
 
 class PolicyEngine:
@@ -32,5 +33,5 @@ class PolicyEngine:
         for policy in self.policies:
             violation = policy(call)
             if violation:
-                return PolicyResult(allowed=False, reason=violation.reason)
+                return PolicyResult(allowed=False, reason=violation.reason, violation=violation)
         return PolicyResult(allowed=True)

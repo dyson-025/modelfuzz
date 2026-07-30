@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-30
+
+- fix: `@shield_tool` now wraps coroutine functions and async generators in kind. Previously it always produced a sync wrapper, so `inspect.iscoroutinefunction()` returned `False` on a shielded `async def` and frameworks (LangChain, MCP) never awaited it — the model received a coroutine `repr` instead of the tool's result
+- fix: stop writing to stdout on every allowed call. stdout is the transport for MCP stdio servers, and the `print()` corrupted the JSON-RPC stream
+- feat: blocked calls are now logged at `WARNING` on the `modelfuzz` logger with structured `modelfuzz_tool` / `modelfuzz_rule` / `modelfuzz_reason` fields, so a denial leaves an audit record
+- fix: `URLAllowList` returns `None` for values that are not URLs, so it can guard a tool like `http_post(url, body, timeout)` without flagging `body` or `timeout`. Previously any multi-argument tool blocked 100% of its legitimate calls
+- fix: `URLAllowList` rejects non-http(s) schemes, which previously passed through for an allowlisted host (`file://api.internal.com/etc/passwd`)
+- fix: `URLAllowList` compares hostnames case-insensitively and tolerates a trailing dot, via `urlparse().hostname` instead of hand-rolled `netloc` splitting
+- feat: `PolicyResult` carries the originating `Violation`, so callers can see which rule fired
+- fix: declare `[tool.hatch.build.targets.sdist]`. The 0.3.1 sdist shipped `.claude/settings.local.json` because hatchling swept the working tree
+- test: cover the async, stdout, structured-logging, keyword-argument and bare-decorator paths that had no coverage (25 → 60 tests)
+
 ## [0.3.1] - 2026-07-30
 
 - docs: replace the Red-Team Scanner example with real captured scan output, contrasting a weak model breached on the first probe against a resistant model whose refusals are mutated into new variants

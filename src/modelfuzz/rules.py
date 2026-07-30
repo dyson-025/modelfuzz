@@ -12,54 +12,86 @@ class Violation:
     reason: str
 
 
+DEFAULT_URL_SCHEMES = frozenset({"http", "https"})
+
+
 class URLAllowList:
-    """A policy that ensures URLs are on an allowlist and blocks parsing tricks."""
+    """A policy that ensures URLs are on an allowlist and blocks parsing tricks.
 
-    def __init__(self, allowed_domains: list[str]) -> None:
-        self.allowed_domains = allowed_domains
+    The policy governs *URLs only*. Arguments that are not URLs -- an email
+    body, a timeout int, None -- are passed through untouched, so a single
+    engine can guard a tool like ``http_post(url, body)`` without flagging
+    ``body``. Note the tradeoff: a bare host with no scheme (``"evil.com"``) is
+    not identifiable as a URL and is therefore allowed through. Pair this with
+    a rule that governs the arguments it does not.
+    """
 
-    def __call__(self, url: str) -> Violation | None:
+    def __init__(
+        self,
+        allowed_domains: list[str],
+        allowed_schemes: set[str] | frozenset[str] | None = None,
+    ) -> None:
+        self.allowed_domains = [d.lower().rstrip(".") for d in allowed_domains]
+        self.allowed_schemes = (
+            frozenset(s.lower() for s in allowed_schemes)
+            if allowed_schemes is not None
+            else DEFAULT_URL_SCHEMES
+        )
+
+    def __call__(self, url: object) -> Violation | None:
         """Check if a URL is allowed.
 
         Args:
-            url: The URL to check.
+            url: The value to check. Non-URL values are not governed by this
+                policy and return None.
 
         Returns:
             A Violation object if the URL is blocked, otherwise None.
         """
-        try:
-            parsed = urlparse(url)
-            domain = parsed.netloc
-
-            # Block userinfo tricks (e.g., http://api.internal.com@evil.com)
-            if "@" in domain:
-                return Violation(
-                    rule_name="URLAllowList",
-                    reason=f"URL contains userinfo trick: {url}",
-                )
-
-            # Extract the hostname without port
-            hostname = domain.split(":")[0]
-
-            # Check for exact match or valid subdomain
-            is_allowed = any(
-                hostname == allowed or hostname.endswith(f".{allowed}")
-                for allowed in self.allowed_domains
-            )
-
-            if not is_allowed:
-                return Violation(
-                    rule_name="URLAllowList",
-                    reason=f"URL domain not in allowlist: {hostname}",
-                )
-
+        if not isinstance(url, str):
             return None
 
+        # A string carrying a scheme separator is claiming to be a URL, so a
+        # parse failure from here on must fail closed rather than sail through.
+        looks_like_url = "://" in url
+
+        try:
+            parsed = urlparse(url)
         except Exception:
-            return Violation(
-                rule_name="URLAllowList",
-                reason=f"Invalid URL: {url}",
-            )
+            return self._block(f"Invalid URL: {url}") if looks_like_url else None
+
+        if not parsed.scheme or not parsed.netloc:
+            return self._block(f"Invalid URL: {url}") if looks_like_url else None
+
+        if parsed.scheme.lower() not in self.allowed_schemes:
+            return self._block(f"URL scheme not allowed: {parsed.scheme}")
+
+        # Block userinfo tricks (e.g., http://api.internal.com@evil.com)
+        if "@" in parsed.netloc:
+            return self._block(f"URL contains userinfo trick: {url}")
+
+        try:
+            hostname = (parsed.hostname or "").rstrip(".")
+        except ValueError:
+            return self._block(f"Invalid URL: {url}")
+
+        if not hostname:
+            return self._block(f"Invalid URL: {url}")
+
+        # Check for exact match or valid subdomain
+        is_allowed = any(
+            hostname == allowed or hostname.endswith(f".{allowed}")
+            for allowed in self.allowed_domains
+        )
+
+        if not is_allowed:
+            return self._block(f"URL domain not in allowlist: {hostname}")
+
+        return None
+
+    @staticmethod
+    def _block(reason: str) -> Violation:
+        return Violation(rule_name="URLAllowList", reason=reason)
 
 
 class SensitiveDataFilter:
