@@ -4,8 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-## [0.3.5] - 2026-07-30
+## [0.3.6] - 2026-07-31
 
+This release makes `modelfuzz scan` work against hosted models. Everything below shipped together; there was no separate 0.3.5 release.
+
+- fix: when the target refuses, `scan` now makes a **separate attacker call** to generate the next payload, instead of feeding the target's refusal back as the next prompt. Against an aligned model the old behaviour degenerated into probing the model's own apologies — reported as `N` attack attempts when only the seeds were real attacks. The attacker call carries the target's refusal as context so the new payload can work around the specific objection raised
+- fix: if the attacker call declines to author a payload (an aligned model often does), that lineage ends rather than continuing with a non-attack. A refusal heuristic (`_looks_like_refusal`) catches the common decline phrasings
 - fix: `scan` now sends `max_tokens` on every request (default `1024`, override with `--max-tokens`). Without it, gateways such as OpenRouter reserve the target model's full context window up front and reject the call with HTTP 402 — so scanning a hosted model failed outright on exactly the credit-limited accounts most first-time users have
 - fix: a reply that hits the token cap without producing a tool call is now reported as `⚠️ TRUNCATED` and counted as unresolved. Previously any response without a tool call was recorded as `SAFE`, so a model cut off mid-compliance would have been scored as having refused — a false negative, which is the one verdict a scanner must never invent
 - feat: `--api-key` reads `MODELFUZZ_API_KEY` when not passed, so the key stays out of shell history and out of the process list
@@ -82,8 +86,8 @@ All notable changes to this project are documented here.
 - CI workflow (lint + tests), MIT license, unit/integration test suite
 - Package renamed from `agentshield` to `modelfuzz`
 
-[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.5...HEAD
-[0.3.5]: https://github.com/higagan/modelfuzz/compare/v0.3.4...v0.3.5
+[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/higagan/modelfuzz/compare/v0.3.4...v0.3.6
 [0.3.4]: https://github.com/higagan/modelfuzz/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/higagan/modelfuzz/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/higagan/modelfuzz/compare/v0.3.1...v0.3.2
