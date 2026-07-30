@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-30
+
 - feat: `modelfuzz scan` is now an adaptive fuzzer — it evolves refused attacks into more deceptive variants and retries within a `--budget-s` time budget, instead of sending a fixed list of static prompts
 - test: add coverage for the scan mutation loop, budget handling, and error paths
 - ci: run tests with all extras installed so the `scan` path is exercised
