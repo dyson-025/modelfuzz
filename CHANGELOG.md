@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-07-31
+
+- docs: add real terminal screenshots to the README — a live `modelfuzz scan` of `openai/gpt-4o-mini` (3/3 seeds break through) and `@shield_tool` blocking an exfiltration attempt at the execution layer. Both are rendered from genuine captured output, and referenced by absolute URL so they render on the PyPI project page as well as on GitHub
+- docs: add `defense_demo.py`, a runnable `URLAllowList` example that blocks an `http_post` to an attacker-controlled host
+
 ## [0.3.6] - 2026-07-31
 
 This release makes `modelfuzz scan` work against hosted models. Everything below shipped together; there was no separate 0.3.5 release.
@@ -86,7 +91,8 @@ This release makes `modelfuzz scan` work against hosted models. Everything below
 - CI workflow (lint + tests), MIT license, unit/integration test suite
 - Package renamed from `agentshield` to `modelfuzz`
 
-[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.6...HEAD
+[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/higagan/modelfuzz/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/higagan/modelfuzz/compare/v0.3.4...v0.3.6
 [0.3.4]: https://github.com/higagan/modelfuzz/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/higagan/modelfuzz/compare/v0.3.2...v0.3.3
