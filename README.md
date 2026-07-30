@@ -29,7 +29,7 @@ def send_email(to_address: str, subject: str, body: str) -> None:
     smtp.send(to_address, subject, body)
 ```
 
-> **Note:** When used bare, `@shield_tool` applies a default `PolicyEngine` that blocks common secrets (API keys, passwords). To define custom rules (like `URLAllowList`), simply pass your own engine: `@shield_tool(engine=my_engine)`.
+> **Note:** When used bare, `@shield_tool` applies a default `PolicyEngine` with a basic `SensitiveDataFilter`. For production use, define your own rules (like `URLAllowList` or custom secret scanners) and pass your own engine: `@shield_tool(engine=my_engine)`.
 
 Works bare (`@shield_tool`) or called (`@shield_tool()`) — both wrap `send_email` identically. Any argument that trips a policy raises `ModelFuzzBlockError` before the function body runs.
 
@@ -99,8 +99,12 @@ Output:
 ## How It Works
 
 - **`PolicyEngine`** — runs an ordered list of policies against every tool-call argument and short-circuits on the first violation. Policies are plain callables (`(value) -> Violation | None`), so writing your own is a one-function job.
-- **`@shield_tool` decorator** — wraps any function so every positional and keyword argument passes through the engine before the function body runs. A violation raises `ModelFuzzBlockError`; the tool never executes.
-- **Default Deny** — allowlist rules like `URLAllowList` block anything not explicitly permitted: unknown domains, userinfo tricks (`http://api.internal.com@evil.com`), and unparseable URLs are all treated as violations. When in doubt, the call doesn't run.
+- **`@shield_tool` decorator** — wraps any function (sync or async) so every positional and keyword argument passes through the engine before the function body runs. A violation raises `ModelFuzzBlockError` and logs a structured warning to stderr; the tool never executes.
+- **Default Deny** — allowlist rules like `URLAllowList` block anything not explicitly permitted: unknown domains, userinfo tricks (`http://api.internal.com@evil.com`), disallowed schemes (`file://`), and unparseable URLs are all treated as violations. When in doubt, the call doesn't run.
+
+## Limitations
+
+ModelFuzz v0.3.3 provides the interception point, the policy protocol, and an adaptive fuzzer. The default `SensitiveDataFilter` uses basic keyword matching and is not a substitute for a dedicated secret-scanning engine. The hosted SaaS dashboard (coming soon) will provide centralized audit logs, policy versioning, and enterprise-grade secret detection.
 
 ## Red-Team Scanner
 
