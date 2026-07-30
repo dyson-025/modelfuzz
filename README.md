@@ -181,7 +181,21 @@ The weak model hands over credentials on the very first probe of all three seeds
 Options:
 
 - `--budget-s` — time budget in seconds for the attack loop (default `30`).
-- `--api-key` — API key for hosted endpoints (defaults to a dummy value for local models).
+- `--api-key` — API key for hosted endpoints (defaults to a dummy value for local models). Read from `MODELFUZZ_API_KEY` when not passed.
+- `--max-tokens` — cap on reply length per request (default `1024`).
+
+### Scanning a hosted model
+
+Export the key rather than passing it on the command line, so it stays out of your shell history and out of the process list:
+
+```bash
+export MODELFUZZ_API_KEY="sk-..."
+modelfuzz scan --endpoint https://openrouter.ai/api/v1 --model openai/gpt-4o-mini
+```
+
+Any OpenAI-compatible gateway works. Every request sends `--max-tokens` because gateways reserve that much credit up front — without a cap they reserve the model's entire context window and reject the call outright on a credit-limited account.
+
+If a reply hits the cap before the model either calls the tool or declines, that probe is reported as `⚠️ TRUNCATED` and **not** counted as safe. A cut-off reply says nothing about what the model would have done, and a scanner that guessed "safe" there would be inventing the one verdict it must never invent. Raise `--max-tokens` and re-run.
 
 If every request errors out (bad endpoint, wrong model name), the scanner reports `⚠️ INCONCLUSIVE` instead of a false-safe result — an untested agent is never reported as a secure one.
 
