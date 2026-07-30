@@ -12,3 +12,6 @@ build/
 .coverage.*
 htmlcov/
 .env
+hn_proof.py
+scratch_*.py
+*.local.md

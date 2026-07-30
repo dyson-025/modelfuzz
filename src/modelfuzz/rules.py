@@ -18,10 +18,17 @@ DEFAULT_URL_SCHEMES = frozenset({"http", "https"})
 class URLAllowList:
     """A policy that ensures URLs are on an allowlist and blocks parsing tricks.
 
-    The policy governs *URLs only*. Arguments that are not URLs -- an email
-    body, a timeout int, None -- are passed through untouched, so a single
-    engine can guard a tool like ``http_post(url, body)`` without flagging
-    ``body``. Note the tradeoff: a bare host with no scheme (``"evil.com"``) is
+    The policy governs *URLs only*. Values that are not URLs -- an email body, a
+    timeout int, None -- are passed through untouched, so a single engine can
+    guard a tool like ``http_post(url, body)`` without flagging ``body``.
+
+    Containers are inspected recursively: a URL hidden inside a ``dict``,
+    ``list``, ``tuple`` or ``set`` argument is checked exactly as a top-level
+    one is, because a payload field such as ``{"redirect": "http://evil.com"}``
+    is as much an exfiltration route as the ``url`` parameter itself. Dict keys
+    are checked as well as values.
+
+    Note the remaining tradeoff: a bare host with no scheme (``"evil.com"``) is
     not identifiable as a URL and is therefore allowed through. Pair this with
     a rule that governs the arguments it does not.
     """
@@ -38,19 +45,39 @@ class URLAllowList:
             else DEFAULT_URL_SCHEMES
         )
 
-    def __call__(self, url: object) -> Violation | None:
-        """Check if a URL is allowed.
+    def __call__(self, data: object) -> Violation | None:
+        """Check every URL reachable from a value.
 
         Args:
-            url: The value to check. Non-URL values are not governed by this
-                policy and return None.
+            data: The value to check. Containers are walked recursively; values
+                that are not URLs are not governed by this policy and pass.
 
         Returns:
-            A Violation object if the URL is blocked, otherwise None.
+            A Violation object if a blocked URL is found, otherwise None.
         """
-        if not isinstance(url, str):
-            return None
+        return self._check_recursive(data, set())
 
+    def _check_recursive(self, data: object, seen: set[int]) -> Violation | None:
+        if isinstance(data, str):
+            return self._check_url(data)
+
+        if isinstance(data, (dict, list, tuple, set, frozenset)):
+            # Guard against self-referential containers, which a hand-built
+            # argument can contain even though JSON-derived ones cannot.
+            if id(data) in seen:
+                return None
+            seen.add(id(data))
+
+            # Keys can carry a URL just as values can, e.g. an endpoint map.
+            items = (*data.keys(), *data.values()) if isinstance(data, dict) else data
+            for item in items:
+                violation = self._check_recursive(item, seen)
+                if violation:
+                    return violation
+
+        return None
+
+    def _check_url(self, url: str) -> Violation | None:
         # A string carrying a scheme separator is claiming to be a URL, so a
         # parse failure from here on must fail closed rather than sail through.
         looks_like_url = "://" in url
