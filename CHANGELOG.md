@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-30
+
+- docs: replace the Red-Team Scanner example with real captured scan output, contrasting a weak model breached on the first probe against a resistant model whose refusals are mutated into new variants
+
 ## [0.3.0] - 2026-07-30
 
 - feat: `modelfuzz scan` is now an adaptive fuzzer — it evolves refused attacks into more deceptive variants and retries within a `--budget-s` time budget, instead of sending a fixed list of static prompts
