@@ -104,7 +104,11 @@ Output:
 
 ## Limitations
 
-ModelFuzz v0.3.3 provides the interception point, the policy protocol, and an adaptive fuzzer. The default `SensitiveDataFilter` uses basic keyword matching and is not a substitute for a dedicated secret-scanning engine. The hosted SaaS dashboard (coming soon) will provide centralized audit logs, policy versioning, and enterprise-grade secret detection.
+ModelFuzz provides the interception point, the policy protocol, and an adaptive fuzzer. The default `SensitiveDataFilter` matches the literal strings `secret`, `password`, and `api_key` — it does not recognise credential formats, so a real `sk-…` or `AKIA…` key will pass through it. Treat it as a demo default and write policies for your own threat model. Also: policies see each argument in isolation, not the whole call, and only `str`, `list`, `tuple`, and `dict` values are inspected.
+
+## Roadmap
+
+A hosted dashboard is in development, providing centralized audit logs, policy versioning, and managed secret detection.
 
 ## Red-Team Scanner
 

@@ -7,7 +7,7 @@ All notable changes to this project are documented here.
 ## [0.3.3] - 2026-07-30
 
 - docs: state plainly what the default `SensitiveDataFilter` does. It matches keywords; it is not a secret-detection engine, and the Quickstart no longer implies otherwise
-- docs: add a `Limitations` section
+- docs: add a `Limitations` section naming what the default filter does and does not catch, and a separate `Roadmap` section for the hosted dashboard
 - docs: note that `@shield_tool` handles sync and async functions and logs a structured warning to stderr on a block
 - docs: record `file://`-style disallowed schemes among the Default Deny cases
 - docs: correct the 0.2.x changelog attributions, which were one release out of step with the tags
