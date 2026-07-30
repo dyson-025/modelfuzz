@@ -116,7 +116,7 @@ Don't just guard your tools — attack them first. `modelfuzz scan` is an adapti
 
 Point it at a local model served by [Ollama](https://ollama.com) or vLLM, or at a hosted API (pass `--api-key` for the latter).
 
-Crucially, the scanner is *reactive*: a refusal isn't the end of the probe. When the target declines a seed attack, the scanner feeds that refusal back in and evolves a new, more deceptive variant — typically reframing the request as a system-level maintenance directive — then probes again on the next generation.
+Crucially, the scanner is *reactive*: a refusal isn't the end of the probe. When the target declines a seed attack, a **separate attacker call** — carrying the target's own refusal as context — generates a fresh payload designed to work around that specific objection, and the new payload is probed on the next generation. If the attacker call declines to produce one (an aligned model asked to write an injection often does), that lineage ends and the scan moves to the next seed rather than probing the apology.
 
 The contrast between a weak and a resistant model shows both halves of that loop:
 
