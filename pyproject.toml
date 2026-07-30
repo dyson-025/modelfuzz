@@ -60,6 +60,7 @@ include = [
     "src/modelfuzz",
     "tests",
     "demo.py",
+    "defense_demo.py",
     "pyproject.toml",
     "README.md",
     "LICENSE",

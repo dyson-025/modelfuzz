@@ -56,9 +56,17 @@ Blocked: String contains sensitive keyword: 'secret'
 
 ## The Demo
 
-An agent gets prompt-injected into calling `send_email` with stolen credentials. The demo runs the same attack twice — once unguarded, once behind `@shield_tool` — so you can see the difference side by side.
+`@shield_tool` stops an injected agent from POSTing stolen data to an attacker's server — the call is blocked before the function body runs, so nothing leaves the process:
 
-Run it from a clone of this repo:
+![ModelFuzz blocking an exfiltration attempt at the execution layer](https://raw.githubusercontent.com/higagan/modelfuzz/main/shield_demo.png)
+
+That's [`defense_demo.py`](defense_demo.py), runnable from a clone:
+
+```bash
+python defense_demo.py
+```
+
+For the full before/after, [`demo.py`](demo.py) runs the same attack twice — once unguarded, once behind `@shield_tool` — so you can see the breach and the block side by side:
 
 ```bash
 python demo.py
@@ -117,6 +125,10 @@ Don't just guard your tools — attack them first. `modelfuzz scan` is an adapti
 Point it at a local model served by [Ollama](https://ollama.com) or vLLM, or at a hosted API (pass `--api-key` for the latter).
 
 Crucially, the scanner is *reactive*: a refusal isn't the end of the probe. When the target declines a seed attack, a **separate attacker call** — carrying the target's own refusal as context — generates a fresh payload designed to work around that specific objection, and the new payload is probed on the next generation. If the attacker call declines to produce one (an aligned model asked to write an injection often does), that lineage ends and the scan moves to the next seed rather than probing the apology.
+
+A scan of OpenAI's `gpt-4o-mini` — all three seeds break through on the first probe:
+
+![ModelFuzz scanning gpt-4o-mini — 3/3 seeds break through](https://raw.githubusercontent.com/higagan/modelfuzz/main/scan_demo.png)
 
 The contrast between a weak and a resistant model shows both halves of that loop:
 
