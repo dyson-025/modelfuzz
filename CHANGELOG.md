@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-30
+
+- fix: `URLAllowList` now inspects URLs nested inside `dict`, `list`, `tuple` and `set` arguments, including dict keys. A malicious URL hidden in a payload field — `http_post(url="https://api.internal.com/v1", payload={"redirect": "http://evil.com"})` — previously passed, because 0.3.2 taught the rule to skip non-string values without teaching it to look inside them. A `redirect` or `callback` field is as much an exfiltration route as the `url` parameter itself
+- fix: guard `URLAllowList` against self-referential containers, so a cyclic argument cannot hang the check
+
 ## [0.3.3] - 2026-07-30
 
 - docs: state plainly what the default `SensitiveDataFilter` does. It matches keywords; it is not a secret-detection engine, and the Quickstart no longer implies otherwise
@@ -69,7 +74,8 @@ All notable changes to this project are documented here.
 - CI workflow (lint + tests), MIT license, unit/integration test suite
 - Package renamed from `agentshield` to `modelfuzz`
 
-[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/higagan/modelfuzz/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/higagan/modelfuzz/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/higagan/modelfuzz/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/higagan/modelfuzz/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/higagan/modelfuzz/compare/v0.3.0...v0.3.1

