@@ -1,6 +1,6 @@
 [project]
 name = "modelfuzz"
-version = "0.3.1"
+version = "0.3.2"
 description = "Runtime guardrails for AI agents."
 readme = "README.md"
 license = { text = "MIT" }
@@ -51,6 +51,30 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/modelfuzz"]
+
+# Without an explicit sdist target, hatchling sweeps the working tree and ships
+# whatever is lying around (0.3.1 shipped .claude/settings.local.json this way).
+# This is an allowlist: anything not named here stays out of the tarball.
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/modelfuzz",
+    "tests",
+    "demo.py",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+]
+exclude = [
+    ".claude",
+    ".coverage*",
+    "htmlcov",
+    ".env",
+    "uv.lock",
+    "**/__pycache__",
+]
 
 [tool.ruff]
 line-length = 100
