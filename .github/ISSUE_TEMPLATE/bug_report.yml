@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible bug in ModelFuzz.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: input
+    id: modelfuzz-version
+    attributes:
+      label: ModelFuzz version
+      description: Which version of ModelFuzz are you using?
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: Which Python version are you using?
+      placeholder: e.g. Python 3.12.4
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      description: Which operating system are you using?
+      placeholder: e.g. Windows 11, Ubuntu 24.04, macOS 15
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest code example that reproduces the issue.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
