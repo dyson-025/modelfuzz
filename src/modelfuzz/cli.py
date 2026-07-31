@@ -273,8 +273,21 @@ def _truncate(text: str, limit: int = 140) -> str:
     return collapsed[: limit - 1] + "…"
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
 @app.callback()
-def cli() -> None:
+def cli(
+    version: bool = typer.Option(
+        None, "--version", "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the installed version and exit.",
+    ),
+) -> None:
     """Runtime guardrails for AI agents."""
 
 
