@@ -1,6 +1,7 @@
 # ModelFuzz
 
 [![CI](https://img.shields.io/github/actions/workflow/status/higagan/modelfuzz/ci.yml?branch=main&label=CI)](https://github.com/higagan/modelfuzz/actions)
+[![PyPI](https://img.shields.io/pypi/v/modelfuzz)](https://pypi.org/project/modelfuzz/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
