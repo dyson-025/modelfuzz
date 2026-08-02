@@ -232,6 +232,8 @@ Or with [uv](https://github.com/astral-sh/uv):
 uv add modelfuzz
 ```
 
+Check the installed version with `modelfuzz --version` (or `-V`).
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and pull-request guidelines.
