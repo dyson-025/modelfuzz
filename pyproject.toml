@@ -69,6 +69,7 @@ include = [
     "CHANGELOG.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
+    "AGENTS.md",
 ]
 exclude = [
     ".claude",
