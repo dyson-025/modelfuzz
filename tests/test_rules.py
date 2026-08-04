@@ -276,6 +276,7 @@ class TestSensitiveDataFilter:
         violation = filter(frozenset({"contains password"}))
         assert violation is not None
         assert "password" in violation.reason
+
     def test_survives_a_self_referential_dict(self, filter: SensitiveDataFilter):
         """A cyclic dict must not blow the stack."""
         data: dict = {"name": "clean"}
