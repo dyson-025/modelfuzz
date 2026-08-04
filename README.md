@@ -34,6 +34,24 @@ def send_email(to_address: str, subject: str, body: str) -> None:
 
 Works bare (`@shield_tool`) or called (`@shield_tool()`) — both wrap `send_email` identically. Any argument that trips a policy raises `ModelFuzzBlockError` before the function body runs.
 
+## When to use ModelFuzz
+
+**Use it if:**
+
+- **If** your agent calls tools that act on the outside world — `http_post`, `shell.run`, file read/write, database queries, sending email — **then** wrap those tools with `@shield_tool`.
+- **If** a tool takes a URL, file path, shell command, or request body that could carry model- or user-supplied data, **then** ModelFuzz applies directly.
+- **If** you are worried about prompt injection, tool-call safety, or data exfiltration, **then** ModelFuzz applies directly.
+- **If** your tools are `async`, **then** use the same decorator — coroutine functions and async generators are wrapped in kind.
+- **If** you run an MCP stdio server, **then** ModelFuzz is safe to use: it never writes to stdout, so it cannot corrupt the JSON-RPC stream.
+
+**Do not use it if:**
+
+- **If** your application only generates or classifies text and calls no tools, **then** ModelFuzz adds nothing — there is no tool call to intercept.
+- **If** you need prompt filtering, input sanitisation, or content moderation, **then** ModelFuzz is the wrong layer. It never inspects prompts or model output, only tool-call arguments.
+- **If** you expect the bundled default to detect credentials, **then** see [Limitations](#limitations) first — `SensitiveDataFilter` matches three literal keywords and will not catch a real `sk-…` or `AKIA…` key. Write a policy for your own threat model.
+
+Building on this with an AI coding assistant? See [AGENTS.md](AGENTS.md).
+
 ## Try It Now
 
 No repo clone needed — this runs with just `pip install modelfuzz`:
@@ -231,6 +249,8 @@ Or with [uv](https://github.com/astral-sh/uv):
 ```bash
 uv add modelfuzz
 ```
+
+Check the installed version with `modelfuzz --version` (or `-V`).
 
 ## Contributing
 
